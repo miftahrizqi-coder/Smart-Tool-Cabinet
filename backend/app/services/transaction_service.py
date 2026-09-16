@@ -210,7 +210,6 @@ class TransactionService:
     # ========================================================
     # GET TRANSACTION
     # ========================================================
-
     def get_transaction(
         self,
         transaction_id: str
@@ -230,6 +229,22 @@ class TransactionService:
 
         return transaction
 
+    # ========================================================
+    # GET ALL TRANSACTIONS
+    # ========================================================
+
+    def get_all_transactions(
+        self,
+        limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """
+        Mengambil daftar seluruh transaction.
+        """
+
+        return (
+            self.transaction_repository
+            .get_all(limit=limit)
+        )
     # ========================================================
     # GET ACTIVE TRANSACTION
     # ========================================================
@@ -269,8 +284,6 @@ class TransactionService:
         transaction_id: str
     ) -> list[dict[str, Any]]:
 
-        # Make sure transaction exists
-
         transaction = (
             self.transaction_repository.get_by_id(
                 transaction_id
@@ -283,11 +296,16 @@ class TransactionService:
                 f"Transaction '{transaction_id}' not found"
             )
 
-        return (
+        items = (
             self.transaction_repository.get_items(
                 transaction_id
             )
         )
+
+        return [
+            self._enrich_transaction_item(item)
+            for item in items
+        ]
 
     # ========================================================
     # ADD TRANSACTION ITEM
@@ -496,7 +514,7 @@ class TransactionService:
             )
         )
 
-        return item
+        return self._enrich_transaction_item(item)
 
     # ========================================================
     # RETURN TRANSACTION ITEM
@@ -591,7 +609,9 @@ class TransactionService:
             transaction_id
         )
 
-        return updated_item
+        return self._enrich_transaction_item(
+            updated_item
+        )
 
     # ========================================================
     # COMPLETE TRANSACTION IF READY
@@ -644,3 +664,127 @@ class TransactionService:
                 "updatedAt": now
             }
         )
+
+    def process_tool_event(
+        self,
+        employee_id: str,
+        cabinet_id: str,
+        tool_id: str,
+        slot_number: int,
+        operation: str
+    ):
+
+        # ========================================================
+        # BORROW
+        # ========================================================
+
+        if operation == "BORROW":
+
+            transaction = self.get_active_transaction(
+                employee_id=employee_id
+            )
+
+            # Belum memiliki transaction aktif
+            if transaction is None:
+
+                transaction = self.create_transaction(
+                    employee_id=employee_id,
+                    cabinet_id=cabinet_id
+                )
+
+            result = self.add_transaction_item(
+                transaction_id=transaction["transactionId"],
+                tool_id=tool_id,
+                slot_number=slot_number
+            )
+
+            # ----------------------------------------------------
+            # UPDATE TOOL STATUS
+            # ----------------------------------------------------
+
+            self.tool_repository.update_status(
+                tool_id=tool_id,
+                status="borrowed"
+            )
+
+            return result
+
+        # ========================================================
+        # RETURN
+        # ========================================================
+
+        if operation == "RETURN":
+
+            transaction = self.get_active_transaction(
+                employee_id=employee_id
+            )
+
+            if transaction is None:
+                raise ValueError(
+                    "No active transaction found"
+                )
+
+            transaction_item = (
+                self.transaction_repository.get_item_by_tool_id(
+                    transaction_id=transaction["transactionId"],
+                    tool_id=tool_id
+                )
+            )
+
+            if transaction_item is None:
+                raise ValueError(
+                    "Transaction item not found for tool"
+                )
+
+            result = self.return_transaction_item(
+                transaction_id=transaction["transactionId"],
+                item_id=transaction_item["transactionItemId"]
+            )
+
+            # ----------------------------------------------------
+            # UPDATE TOOL STATUS
+            # ----------------------------------------------------
+
+            self.tool_repository.update_status(
+                tool_id=tool_id,
+                status="available"
+            )
+
+            return result
+
+        # ========================================================
+        # INVALID OPERATION
+        # ========================================================
+
+        raise ValueError(
+            f"Unsupported operation: {operation}"
+        )
+    # ========================================================
+    # HELPER - ENRICH TRANSACTION ITEM
+    # ========================================================
+
+    def _enrich_transaction_item(
+        self,
+        item: dict[str, Any]
+    ) -> dict[str, Any]:
+
+        tool = (
+            self.tool_repository.get_by_id(
+                item["toolId"]
+            )
+        )
+
+        result = item.copy()
+
+        if tool is not None:
+            result["toolName"] = tool.get("name", "")
+            result["assetNumber"] = tool.get(
+                "assetNumber",
+                ""
+            )
+        else:
+            result["toolName"] = ""
+            result["assetNumber"] = ""
+
+        return result
+transaction_service=TransactionService()

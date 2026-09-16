@@ -34,6 +34,8 @@ class TransactionItemResponse(BaseModel):
     transactionItemId: str
 
     toolId: str
+    toolName: str
+    assetNumber: str
 
     cabinetId: str
 

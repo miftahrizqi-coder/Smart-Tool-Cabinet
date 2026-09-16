@@ -65,7 +65,7 @@ class CabinetService:
 
             "slotCount": data.slotCount,
 
-            "status": "active",
+            "status": "online",
 
             "doorStatus": "closed",
 
