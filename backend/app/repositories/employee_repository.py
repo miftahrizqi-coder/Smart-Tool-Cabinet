@@ -113,3 +113,21 @@ class EmployeeRepository:
         )
 
         return self.get_by_id(employee_id)
+
+    def get_pin_hash(
+        self,
+        employee_id: str
+    ):
+        doc = (
+            self.db
+            .collection("employees")
+            .document(employee_id)
+            .get()
+        )
+
+        if not doc.exists:
+            return None
+
+        data = doc.to_dict()
+
+        return data.get("pinHash")

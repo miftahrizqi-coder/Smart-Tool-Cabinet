@@ -16,7 +16,7 @@ from app.core.exceptions import AppException
 
 
 router = APIRouter(
-    prefix="/transactions",
+    prefix="/api/v1/transactions",
     tags=["Transactions"]
 )
 
@@ -214,6 +214,19 @@ def return_transaction_item(
 
     except AppException as e:
 
+        raise HTTPException(
+            status_code=e.status_code,
+            detail=e.message
+        )
+
+@router.get(
+    "",
+    response_model=list[TransactionResponse]
+)
+def get_transactions():
+    try:
+        return transaction_service.get_all_transactions()
+    except AppException as e:
         raise HTTPException(
             status_code=e.status_code,
             detail=e.message

@@ -312,3 +312,36 @@ class TransactionRepository:
         ref.delete()
 
         return True
+
+    def get_item_by_tool_id(
+        self,
+        transaction_id: str,
+        tool_id: str
+    ) -> dict[str, Any] | None:
+        """
+        Mengambil transaction item berdasarkan tool_id
+        dari sebuah transaction.
+        """
+
+        documents = (
+            db.collection(self.COLLECTION)
+            .document(transaction_id)
+            .collection(self.ITEMS_COLLECTION)
+            .where(
+                "toolId",
+                "==",
+                tool_id
+            )
+            .limit(1)
+            .stream()
+        )
+
+        for document in documents:
+
+            data = document.to_dict()
+
+            data["transactionItemId"] = document.id
+
+            return data
+
+        return None
